@@ -1,9 +1,11 @@
+//generation of 6 rows with maximum 100 positions length //
 let N = toint(rand()*100) + 1;
 let x = toint(rand()*100) + 1;
 let z = toint(rand()*100) + 1;
 let a = toint(rand()*100) + 1;
 let b = toint(rand()*100) + 1;
 let c = toint(rand()*100) + 1;
+//creation of function to call the distinct variables//
 let GenerateRandomArray = (Length:int) {
     range i from 1 to Length step 1
     | extend RandomValue = toint(rand()*100) + 1
@@ -13,6 +15,8 @@ let GenerateRandomArray = (Length:int) {
     | extend last_value = random[last_value_position]
     | project-away list_RandomValue, last_value_position
 };
+//Calling the functions//
 GenerateRandomArray(N)
 | union kind=inner GenerateRandomArray(x) , GenerateRandomArray(z), GenerateRandomArray(a), GenerateRandomArray(b), GenerateRandomArray(c)
+//Math operations over last values of each array//
 | summarize  max(toint(last_value)), min(toint(last_value)), Mediana=percentile(toint(last_value), 50)
