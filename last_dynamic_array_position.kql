@@ -15,3 +15,4 @@ let GenerateRandomArray = (Length:int) {
 };
 GenerateRandomArray(N)
 | union kind=inner GenerateRandomArray(x) , GenerateRandomArray(z), GenerateRandomArray(a), GenerateRandomArray(b), GenerateRandomArray(c)
+| summarize  max(toint(last_value)), min(toint(last_value)), Mediana=percentile(toint(last_value), 50)
