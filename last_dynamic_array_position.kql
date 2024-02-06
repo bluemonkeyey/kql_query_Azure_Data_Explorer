@@ -1,0 +1,17 @@
+let N = toint(rand()*100) + 1;
+let x = toint(rand()*100) + 1;
+let z = toint(rand()*100) + 1;
+let a = toint(rand()*100) + 1;
+let b = toint(rand()*100) + 1;
+let c = toint(rand()*100) + 1;
+let GenerateRandomArray = (Length:int) {
+    range i from 1 to Length step 1
+    | extend RandomValue = toint(rand()*100) + 1
+    | summarize make_list(RandomValue)
+    | extend random = parse_json(tostring(list_RandomValue))
+    | extend last_value_position = array_length(random) -1
+    | extend last_value = random[last_value_position]
+    | project-away list_RandomValue, last_value_position
+};
+GenerateRandomArray(N)
+| union kind=inner GenerateRandomArray(x) , GenerateRandomArray(z), GenerateRandomArray(a), GenerateRandomArray(b), GenerateRandomArray(c)
