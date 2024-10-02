@@ -1,0 +1,7 @@
+SecurityAlert
+| where AlertName == "Reviewed_Detection" //Insert reviewed detection
+| where TimeGenerated between (ago(365d) .. now())//Analysis make over 365 days, you can change the value 
+| extend Period = iif(TimeGenerated < RevisionDate, "Before Review", "After Review")
+| make-series AlertCount = count() on TimeGenerated from ago(365d) to now() step 1d by Period  // Time Series Values
+| project TimeGenerated, AlertCount, Period
+| render timechart
