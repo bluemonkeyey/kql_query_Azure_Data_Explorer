@@ -14,8 +14,8 @@ def extraer_campos_de_query(query):
         return []
 
 def comprobar_campos(campos_estandar, query):
-    # tolower checker
-    campos_estandar_lower = [campo.lower() for campo in campos_estandar]
+    # Keep original field names for suggestions
+    campos_estandar_dict = {campo.lower(): campo for campo in campos_estandar}
     resultados = []
 
     # extract query fields
@@ -26,11 +26,14 @@ def comprobar_campos(campos_estandar, query):
         campo_lower = campo.lower()
 
         # basic correct checker
-        if campo_lower in campos_estandar_lower:
+        if campo_lower in campos_estandar_dict:
             resultados.append((campo, "Sí", "Campo estandarizado"))
         else:
             # partial matches
-            sugerencias = get_close_matches(campo_lower, campos_estandar_lower, n=3, cutoff=0.5)
+            sugerencias_lower = get_close_matches(campo_lower, campos_estandar_dict.keys(), n=3, cutoff=0.5)
+
+            # Convert suggestions back to original case
+            sugerencias = [campos_estandar_dict[sug] for sug in sugerencias_lower]
 
             # substring suggestions
             subcadena_sugerencias = [c for c in campos_estandar if campo_lower in c.lower()]
@@ -47,10 +50,10 @@ def comprobar_campos(campos_estandar, query):
         print(f"Campo: {campo}, Estandarizado: {estandarizado}, Sugerencias: {sugerencia}")
 
 # standard fields
-campos_estandar = ["field1", "field2"]
+campos_estandar = ["ActivityDate", "UserName", "Timestamp", "Status"]
 
 query = """
-| project
+| project ActivityDate, username, Time-stamp, status
 """
 
 comprobar_campos(campos_estandar, query)
