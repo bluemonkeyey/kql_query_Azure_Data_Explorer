@@ -45,15 +45,24 @@ def comprobar_campos(campos_estandar, query):
             else:
                 resultados.append((campo, "No", "Sin sugerencias"))
 
+    # Check if the order of the fields matches the standard
+    orden_correcto = [campo.lower() for campo in campos_estandar] == [campo.lower() for campo in campos_en_query]
+
     # print results
     for campo, estandarizado, sugerencia in resultados:
         print(f"Campo: {campo}, Estandarizado: {estandarizado}, Sugerencias: {sugerencia}")
 
+    # Inform about the order
+    if orden_correcto:
+        print("El orden de los campos es correcto.")
+    else:
+        print("El orden de los campos es incorrecto.")
+
 # standard fields
-campos_estandar = ["ActivityDate", "UserName", "Timestamp", "Status"]
+campos_estandar = ["Atun", "Paco", "Mama"]
 
 query = """
-| project ActivityDate, username, Time-stamp, status
+| project Atun, Mama, Paco
 """
 
 comprobar_campos(campos_estandar, query)
