@@ -48,7 +48,7 @@ def comprobar_campos(campos_estandar, query):
     # Check if the order of the fields matches the standard
     orden_correcto = [campo.lower() for campo in campos_estandar] == [campo.lower() for campo in campos_en_query]
 
-    # print results
+    # Print results
     for campo, estandarizado, sugerencia in resultados:
         print(f"Campo: {campo}, Estandarizado: {estandarizado}, Sugerencias: {sugerencia}")
 
@@ -57,6 +57,11 @@ def comprobar_campos(campos_estandar, query):
         print("El orden de los campos es correcto.")
     else:
         print("El orden de los campos es incorrecto.")
+
+    # Output the fields sorted alphabetically
+    campos_ordenados = sorted(campos_en_query, key=lambda s: s.lower())
+    print("\nCampos ordenados alfabéticamente:")
+    print(", ".join(campos_ordenados))
 
 # standard fields
 campos_estandar = ["Atun", "Paco", "Mama"]
