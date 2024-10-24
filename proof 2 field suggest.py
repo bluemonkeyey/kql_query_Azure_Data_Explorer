@@ -63,6 +63,11 @@ def comprobar_campos(campos_estandar, query):
     print("\nCampos ordenados alfabéticamente:")
     print(", ".join(campos_ordenados))
 
+    # Output the original project with comma separated by space
+    project_original = ", ".join(campos_en_query)
+    print("\nProject original con comas separadas por espacio:")
+    print(f"project {project_original}")
+
 # standard fields
 campos_estandar = ["Atun", "Paco", "Mama"]
 
