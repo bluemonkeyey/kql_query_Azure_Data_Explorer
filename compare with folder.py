@@ -5,7 +5,7 @@ import yaml
 
 def compare_title_with_rule():
     # Especifica la ruta de la carpeta donde están tus archivos
-    folder_path = 'ruta/a/tu/carpeta'  # Reemplaza esto con la ruta real
+    folder_path = r'ruta/a/tu/carpeta'  # Reemplaza esto con la ruta real
 
     # Construye las rutas completas a los archivos
     rule_file_path = os.path.join(folder_path, 'rule.yml')
