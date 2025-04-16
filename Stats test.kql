@@ -1,0 +1,18 @@
+let stats = datatable (data:dynamic)
+[
+30,90,57,55,63,100,7,5,3,2,1,4,5,6,5,3,2,12,2,1,4,5,6,7,6,4,3,6,4,3,2,4,5,8,8,7,7,6,7,7,8,9,3,2,1
+];
+let mode = stats
+| summarize count() by tostring(data)| top 1 by count_ desc | project-away count_ | extend dummy = 1;
+let stats_plus_mode= stats
+| summarize avg(toint(data)), mediana= percentile(toint(data),50), stdev(toint(data)),
+tukey_limits = (percentile(toint(data),75)+ 1.5 * (percentile(toint(data), 75) - percentile(toint(data),25)))
+| extend dummy = 1
+| join mode on dummy
+| extend outlier= (stdev_data * 2), skew_positive = iff(avg_data > mediana, "True", "False"), skew_improve = (abs(avg_data - mediana)/stdev_data);
+stats
+| extend dummy = 1
+| join kind=fullouter stats_plus_mode on dummy
+| project-away dummy, dummy1, dummy2, data1
+| extend zscore = ((toint(data) - avg_data) / stdev_data)
+| project malisioso=iff(data > tukey_limits,"malo","no"), malisioso_outlier = iff(zscore > 2,"malo","no"), data, skew_positive, skew_improve
