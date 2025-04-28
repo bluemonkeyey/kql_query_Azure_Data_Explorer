@@ -1,18 +1,37 @@
-let stats = datatable (data:dynamic)
+let stats = datatable(data: dynamic)
 [
-30,90,57,55,63,100,7,5,3,2,1,4,5,6,5,3,2,12,2,1,4,5,6,7,6,4,3,6,4,3,2,4,5,8,8,7,7,6,7,7,8,9,3,2,1
+    dynamic([1000,900,30,50,7,5,3,2,1,4,5,6,5,3,2,12,2,1,4,5,6,7,6,4,3,6,4,3,2,4,5,8,8,7,7,6,7,7,8,9,3,2,1])
 ];
-let mode = stats
-| summarize count() by tostring(data)| top 1 by count_ desc | project-away count_ | extend dummy = 1;
-let stats_plus_mode= stats
-| summarize avg(toint(data)), mediana= percentile(toint(data),50), stdev(toint(data)),
-tukey_limits = (percentile(toint(data),75)+ 1.5 * (percentile(toint(data), 75) - percentile(toint(data),25)))
-| extend dummy = 1
-| join mode on dummy
-| extend outlier= (stdev_data * 2), skew_positive = iff(avg_data > mediana, "True", "False"), skew_improve = (abs(avg_data - mediana)/stdev_data);
-stats
-| extend dummy = 1
-| join kind=fullouter stats_plus_mode on dummy
-| project-away dummy, dummy1, dummy2, data1
-| extend zscore = ((toint(data) - avg_data) / stdev_data)
-| project malisioso=iff(data > tukey_limits,"malo","no"), malisioso_outlier = iff(zscore > 2,"malo","no"), data, skew_positive, skew_improve
+// Expandimos el array y le damos clave para joins posteriores
+let expanded = stats
+| mv-expand value = data
+| project value = toint(value)
+| extend key = 1;
+// Moda del conjunto
+let moda = expanded
+| summarize freq = count() by value
+| top 1 by freq desc
+| project moda = value
+| extend key = 1;
+// Estadísticas principales
+let estadisticas = expanded
+| summarize 
+    media = avg(value),
+    mediana = percentile(value, 50),
+    stdev = stdev(value),
+    Q1 = percentile(value, 25),
+    Q3 = percentile(value, 75)
+| extend 
+    tukey_limit = Q3 + 1.5 * (Q3 - Q1),
+    key = 1;
+// Unimos todo y calculamos detección
+expanded
+| join kind=inner (estadisticas) on key
+| join kind=inner (moda) on key
+| project-away key
+| extend 
+    zscore = (value - media) / stdev
+| extend 
+    malisioso_iqr = iff(value > tukey_limit, "malo", "no"),
+    malisioso_outlier = iff(zscore > 2, "malo", "no"),
+    sesgo= iff(media > mediana, "True", "False")
