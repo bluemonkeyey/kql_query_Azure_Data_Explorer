@@ -31,7 +31,9 @@ expanded
 | join kind=inner (moda) on key
 | project-away key, key1, key2
 | extend 
-    zscore = (value - media) / stdev
+    zscore = (value - media) / stdev,
+    skewness_pearson_1 = ((media - moda)/stdev),
+    skewness_pearson_2 = (3*(media - mediana)/stdev)
 | extend 
     malisioso_iqr = iff(value > tukey_limit, "malo", "no"),
     malisioso_outlier_zscore = iff(zscore > 2, "malo", "no"),
