@@ -23,15 +23,16 @@ let estadisticas = expanded
     Q3 = percentile(value, 75)
 | extend 
     tukey_limit = Q3 + 1.5 * (Q3 - Q1),
+    IQR = (Q3 - Q1),
     key = 1;
 // Unimos todo y calculamos detección
 expanded
 | join kind=inner (estadisticas) on key
 | join kind=inner (moda) on key
-| project-away key
+| project-away key, key1, key2
 | extend 
     zscore = (value - media) / stdev
 | extend 
     malisioso_iqr = iff(value > tukey_limit, "malo", "no"),
-    malisioso_outlier = iff(zscore > 2, "malo", "no"),
+    malisioso_outlier_zscore = iff(zscore > 2, "malo", "no"),
     sesgo= iff(media > mediana, "True", "False")
