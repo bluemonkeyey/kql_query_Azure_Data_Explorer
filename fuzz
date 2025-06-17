@@ -1,0 +1,57 @@
+index="apache"
+| bin _time span=1h 
+| where NOT cidrmatch("10.0.0.0/8", src) 
+    AND NOT cidrmatch("192.168.0.0/16", src) 
+    AND NOT cidrmatch("172.16.0.0/12", src)
+| where match(uri_path, ".*(phpmyadmin|\.env|\.git|login|wp-admin|wwwadmin|config(\.bak|\.old|\.json)?|admin|backup|bak|old|db|database\.sql|dump\.sql|site_backup\.zip|secrets|credentials|settings\.py|appsettings\.json|web\.config|local\.settings\.json|dashboard|cms|controlpanel|console|panel|manage|administrator|laravel\.log|symfony|env\.php|thinkphp|vendor|node_modules|package\.json|composer\.lock|test\.php|phpinfo\.php|debug|staging|qa|www\.zip|source_code\.tar\.gz|src\.tar\.gz|codebase\.zip|site\.tar\.gz|\.php).*") 
+| eval es_200 = if(status == 200, 1, 0) 
+| stats 
+    count as total_counter,
+    dc(uri_path) as num_paths_unicos,
+    count(eval(status>=400)) as num_errores,
+    values(status) as statuses,
+    values(uri_path) as all_paths,
+    values(dest_ip) as targets,
+    values(http_user_agent) as user_agents,
+    values(src) as srcs,
+    count(eval(status==200)) as total_200,
+    values(eval(if(status==200, uri_path, null()))) as paths_200
+    by glk_entidad, _time, src 
+| eval tiene_200 = if(total_200 > 0, "sí", "no") 
+| eventstats 
+    avg(total_counter) as media,
+    stdev(total_counter) as desv,
+    median(total_counter) as mediana,
+    perc25(total_counter) as Q1,
+    perc75(total_counter) as Q3 
+| eval 
+    sesgo_pearson_2 = round(3 * (media - mediana) / desv, 3),
+    IQR = Q3 - Q1,
+    Tukeys_Limits_Upper = Q3 + (1.5 * IQR),
+    zscore = round((total_counter - media) / desv, 3),
+    tipo_sesgo = case(
+    abs(sesgo_pearson_2) < 1, "Z-score",
+    abs(sesgo_pearson_2) >= 1, "IQR",
+    true(), "No clasificado"
+    )
+| where 
+    (tiene_200=="sí" AND (
+    (tipo_sesgo == "Z-score" AND zscore > 3)
+    OR (tipo_sesgo == "IQR" AND total_counter > Tukeys_Limits_Upper)
+    ))
+    OR 
+    (tiene_200=="no" AND (
+    (tipo_sesgo == "Z-score" AND zscore > 6)
+    OR (tipo_sesgo == "IQR" AND total_counter > Tukeys_Limits_Upper * 2)
+    )) 
+| eval 
+    detection_type = case(
+    tiene_200=="sí", "Fuzzing con acceso exitoso (200)",
+    tiene_200=="no", "Fuzzing sin éxito pero con volumetría"
+    ),
+    first_seen_time = strftime(_time, "%Y-%m-%d %H:%M:%S") 
+| table 
+    first_seen_time, glk_entidad, srcs, targets, user_agents,
+    total_counter, total_200, zscore, Tukeys_Limits_Upper, sesgo_pearson_2, tipo_sesgo,
+    num_paths_unicos, num_errores, statuses, paths_200, all_paths, detection_type 
+| sort -zscore
