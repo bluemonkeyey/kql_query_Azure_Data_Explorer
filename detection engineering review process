@@ -1,7 +1,7 @@
-search index=notable earliest=-6mon
-| bucket _time span=1mon
-| eval month = strftime(_time, "%Y-%m")
-| stats count as monthly_count by search_name month
+index=notable earliest=-6mon 
+| bucket _time span=1mon 
+| eval month = strftime(_time, "%Y-%m") 
+| stats count as monthly_count by search_name month 
 | eventstats 
     perc25(monthly_count) as Q1,
     perc75(monthly_count) as Q3,
@@ -9,16 +9,16 @@ search index=notable earliest=-6mon
     mean(monthly_count) as mean,
     median(monthly_count) as median,
     stdev(monthly_count) as stdev
-    by search_name
-| eval IQR = Q3 - Q1
-| eval lower_tukey = Q1 - 1.5*IQR
-| eval upper_tukey = Q3 + 1.5*IQR
-| eval z_score = if(stdev>0, (monthly_count - mean)/stdev, null())
-| eval is_outlier_z = if(abs(z_score) > 2, 1, 0)
-| eval is_outlier_tukey = if(monthly_count > upper_tukey OR monthly_count < lower_tukey, 1, 0)
-| eval mes_actual=strftime(now(), "%Y-%m")
-| eval monthly_actual=if(month==mes_actual, monthly_count, null())
-| sort search_name, month
+    by search_name 
+| eval IQR = Q3 - Q1 
+| eval lower_tukey = Q1 - 1.5 * IQR 
+| eval upper_tukey = Q3 + 1.5 * IQR 
+| eval z_score = if(stdev>0, (monthly_count - mean)/stdev, null()) 
+| eval is_outlier_z = if(abs(z_score) > 2, 1, 0) 
+| eval is_outlier_tukey = if(monthly_count > upper_tukey OR monthly_count < lower_tukey, 1, 0) 
+| eval mes_actual = strftime(now(), "%Y-%m") 
+| eval monthly_actual = if(month == mes_actual, monthly_count, null()) 
+| sort search_name, month 
 | eventstats 
     list(month) as meses, 
     list(monthly_count) as counts, 
@@ -29,16 +29,15 @@ search index=notable earliest=-6mon
     values(median) as median,
     values(stdev) as stdev,
     max(monthly_actual) as total_mes_actual
-    by search_name
-| eval resumen_mensual=mvzip(meses, counts, " - ")
-| eval resumen_mensual=mvmap(resumen_mensual, mvindex(split(resumen_mensual," - "),0) . ": " . mvindex(split(resumen_mensual," - "),1) . " alertas")
-| eval resumen_mensual=mvjoin(resumen_mensual, "  ")
-| eval skewness = if(stdev>0, round(3*(mean - median)/stdev, 3), null())
+    by search_name 
+| eval resumen_mensual = mvzip(meses, counts, " - ") 
+| eval resumen_mensual = mvmap(resumen_mensual, mvindex(split(resumen_mensual," - "),0) . ": " . mvindex(split(resumen_mensual," - "),1) . " alertas") 
+| eval resumen_mensual = mvjoin(resumen_mensual, "  ") 
+| eval skewness = if(stdev>0, round(3 * (mean - median) / stdev, 3), null()) 
 | eval clasificacion_analitica = case(
     mvcount(counts)==0, "Sin actividad reciente",
     mvcount(counts)<=2 AND 
-    (tonumber(mvindex(counts, 0)) + 
-    coalesce(tonumber(mvindex(counts, 1)), 0)) <= 5, 
+    (tonumber(mvindex(counts, 0)) + coalesce(tonumber(mvindex(counts, 1)), 0)) <= 5, 
     "Volumen muy bajo sin patrón claro",
     z_outliers >= 2, "Variabilidad mensual significativa (Z-score)",
     tukey_outliers >= 2, "Picos atípicos recurrentes (Tukey)",
@@ -47,17 +46,34 @@ search index=notable earliest=-6mon
     avg_monthly > 100, "Volumen alto y estable",
     avg_monthly < 5, "Volumen bajo y estable",
     true(), "Comportamiento mensual regular"
-)
+    ) 
 | eval prioridad_revision = case(
-    total_mes_actual > 100 AND (z_outliers >= 1 OR tukey_outliers >= 1), "Alta (ruido o ataque activo)",
-    clasificacion_analitica=="Variabilidad mensual significativa (Z-score)", "Media-Alta (Z-score)",
-    clasificacion_analitica=="Picos atípicos recurrentes (Tukey)", "Media-Alta (Tukey)",
-    clasificacion_analitica=="Sesgo a meses con picos altos", "Media (sesgo alto)",
-    clasificacion_analitica=="Volumen alto y estable", "Baja (monitorizar)",
-    clasificacion_analitica=="Comportamiento mensual regular", "Baja (estable)",
-    clasificacion_analitica=="Sin actividad reciente", "Muy baja (sin eventos)",
-    clasificacion_analitica=="Volumen muy bajo sin patrón claro", "Baja (analizar relevancia)",
-    true(), "Revisar manualmente"
-)
-| table search_name, total_mes_actual, resumen_mensual, clasificacion_analitica, prioridad_revision
-| sort -prioridad_revision, -total_mes_actual
+    clasificacion_analitica=="Volumen alto y estable", "Auditar uso real y eficacia",
+    clasificacion_analitica=="Variabilidad mensual significativa (Z-score)", "Analizar lógica ante picos",
+    clasificacion_analitica=="Picos atípicos recurrentes (Tukey)", "Validar reglas de filtrado y condiciones",
+    clasificacion_analitica=="Sesgo a meses con picos altos", "Revisar contexto de explosión",
+    clasificacion_analitica=="Sesgo a meses con baja actividad", "Revisar utilidad actual",
+    clasificacion_analitica=="Volumen bajo y estable", "Revisar manualmente",
+    clasificacion_analitica=="Volumen muy bajo sin patrón claro", "Posible retirada o consolidación",
+    clasificacion_analitica=="Sin actividad reciente", "Depurar reglas inactivas",
+    true(), "Sin prioridad crítica"
+    ) 
+| eval nivel_prioridad = case(
+    prioridad_revision=="Auditar uso real y eficacia", 1,
+    prioridad_revision=="Analizar lógica ante picos", 1,
+    prioridad_revision=="Validar reglas de filtrado y condiciones", 2,
+    prioridad_revision=="Revisar contexto de explosión", 2,
+    prioridad_revision=="Revisar utilidad actual", 2,
+    prioridad_revision=="Revisar manualmente", 3,
+    prioridad_revision=="Posible retirada o consolidación", 3,
+    prioridad_revision=="Depurar reglas inactivas", 3,
+    true(), 4
+    ) 
+| stats 
+    max(total_mes_actual) as total_mes_actual 
+    latest(resumen_mensual) as resumen_mensual 
+    latest(clasificacion_analitica) as clasificacion_analitica 
+    latest(prioridad_revision) as prioridad_revision 
+    latest(nivel_prioridad) as nivel_prioridad
+    by search_name 
+| sort nivel_prioridad asc
